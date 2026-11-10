@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#FFF4E0">
+  <title>Su Ustası</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app" data-state="boot">
+    <!-- top HUD (gameplay_hud.jpg): lives panel left, level info center, settings right -->
+    <header class="hud-top">
+      <div class="panel lives" id="lives" aria-label="Kalan damla"></div>
+      <div class="level-info">
+        <div class="level-title" id="level-title">Su Ustası</div>
+        <div class="level-sub" id="level-sub"></div>
+        <button class="coins" id="coins" type="button" title="Mağaza"><span class="coin-icon"></span><span id="coin-count">0</span></button>
+      </div>
+      <button class="icon-btn" id="btn-settings" type="button" aria-label="Ayarlar"><img src="assets/sprites/btn_settings.png" alt=""></button>
+    </header>
+
+    <main class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="Oyun tahtası"></canvas>
+      <div class="tooltip hidden" id="tooltip"></div>
+    </main>
+
+    <!-- boosters (unlock 5 / 10 / 15) -->
+    <footer class="boosters">
+      <button class="booster" data-booster="xray" type="button" aria-label="Röntgen"><img src="assets/sprites/booster_xray.png" alt=""><span class="badge"></span><span class="lock-tag"></span><span class="booster-name">Röntgen</span></button>
+      <button class="booster" data-booster="hammer" type="button" aria-label="Çekiç"><img src="assets/sprites/booster_hammer.png" alt=""><span class="badge"></span><span class="lock-tag"></span><span class="booster-name">Çekiç</span></button>
+      <button class="booster" data-booster="patch" type="button" aria-label="Yama"><img src="assets/sprites/booster_patch.png" alt=""><span class="badge"></span><span class="lock-tag"></span><span class="booster-name">Yama</span></button>
+    </footer>
+
+    <canvas id="fx" aria-hidden="true"></canvas>
+    <div class="overlay hidden" id="overlay" role="dialog" aria-modal="true"></div>
+    <div class="toast hidden" id="toast" role="status"></div>
+    <aside class="dev hidden collapsed" id="dev"></aside>
+  </div>
+
+  <script src="js/core.js"></script>
+  <script src="js/solver.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "level": 36,
+  "grid": [7, 8],
+  "tank": { "x": 2, "y": 2, "w": 3, "h": 3 },
+  "leaks": 3,
+  "pipes": [
+    { "id": "p1", "type": "elbow", "cells": [[1,2],[0,2],[0,1],[0,0]], "dir": "left" },
+    { "id": "p2", "type": "straight", "cells": [[1,0],[2,0],[3,0],[4,0]], "dir": "up" },
+    { "id": "p3", "type": "leaking", "cells": [[5,1],[6,1],[6,0]], "dir": "up", "leakTimerMoves": 6 },
+    { "id": "p4", "type": "straight", "cells": [[1,1],[2,1],[3,1],[4,1]], "dir": "left" },
+    { "id": "p5", "type": "elbow", "cells": [[5,2],[6,2],[6,3],[6,4],[6,5]], "dir": "right" },
+    { "id": "p6", "type": "rusty", "cells": [[1,3],[0,3],[0,4],[0,5],[0,6]], "dir": "up" },
+    { "id": "p7", "type": "frozen", "cells": [[5,3],[5,4],[5,5],[5,6],[5,7]], "dir": "down", "iceCount": 1 },
+    { "id": "p8", "type": "rusty", "cells": [[4,5],[3,5],[2,5],[1,5],[1,4]], "dir": "left" },
+    { "id": "p9", "type": "elbow", "cells": [[1,6],[2,6],[3,6],[4,6],[4,7]], "dir": "right" },
+    { "id": "p10", "type": "straight", "cells": [[6,6],[6,7]], "dir": "down" },
+    { "id": "p11", "type": "straight", "cells": [[0,7],[1,7],[2,7],[3,7]], "dir": "left" }
+  ]
+}

@@ -1,0 +1,18 @@
+# tooling caches / generated previews
+node_modules/
+tools/.cache/
+tools/sprite_preview.png
+__pycache__/
+
+# Unity
+unity-project/[Ll]ibrary/
+unity-project/[Tt]emp/
+unity-project/[Oo]bj/
+unity-project/[Bb]uild/
+unity-project/[Bb]uilds/
+unity-project/[Ll]ogs/
+unity-project/[Uu]ser[Ss]ettings/
+unity-project/*.csproj
+unity-project/*.sln
+unity-project/.vs/
+unity-project/.idea/

@@ -1,0 +1,23 @@
+{
+    "name": "SuUstasi.Runtime",
+    "rootNamespace": "SuUstasi.Runtime",
+    "references": [
+        "SuUstasi.Core",
+        "SuUstasi.LevelGen",
+        "SuUstasi.Services",
+        "SuUstasi.Gameplay",
+        "UnityEngine.UI",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        { "name": "com.unity.inputsystem", "expression": "1.0.0", "define": "SU_INPUT_SYSTEM" }
+    ],
+    "noEngineReferences": false
+}

@@ -1,0 +1,24 @@
+{
+    "name": "SuUstasi.Editor",
+    "rootNamespace": "SuUstasi.EditorTools",
+    "references": [
+        "SuUstasi.Core",
+        "SuUstasi.LevelGen",
+        "SuUstasi.Services",
+        "SuUstasi.Gameplay",
+        "SuUstasi.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        { "name": "com.unity.render-pipelines.universal", "expression": "12.0.0", "define": "SU_URP" }
+    ],
+    "noEngineReferences": false
+}

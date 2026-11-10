@@ -1,0 +1,15 @@
+{
+  "level": 11,
+  "grid": [6, 6],
+  "tank": { "x": 2, "y": 2, "w": 2, "h": 2 },
+  "leaks": 3,
+  "pipes": [
+    { "id": "p1", "type": "straight", "cells": [[1,0],[2,0],[3,0],[4,0]], "dir": "left" },
+    { "id": "p2", "type": "straight", "cells": [[5,0],[5,1],[5,2],[5,3]], "dir": "up" },
+    { "id": "p3", "type": "straight", "cells": [[0,1],[0,2],[0,3],[0,4]], "dir": "down" },
+    { "id": "p4", "type": "elbow", "cells": [[3,1],[2,1],[1,1],[1,2]], "dir": "left" },
+    { "id": "p5", "type": "straight", "cells": [[4,1],[4,2],[4,3]], "dir": "up" },
+    { "id": "p6", "type": "elbow", "cells": [[3,5],[2,5],[1,5],[1,4]], "dir": "down" },
+    { "id": "p7", "type": "straight", "cells": [[2,4],[3,4],[4,4],[5,4]], "dir": "right" }
+  ]
+}

@@ -1,0 +1,335 @@
+{
+  "generatedBy": "tools/slice_sprites.py",
+  "sprites": [
+    {
+      "name": "pipe_straight",
+      "group": "Pipes",
+      "source": "pipes_spritesheet.jpg",
+      "sourceRect": [
+        118,
+        128,
+        676,
+        652
+      ],
+      "size": [
+        512,
+        481
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEED0",
+      "components": 1,
+      "holesFilled": 6
+    },
+    {
+      "name": "pipe_elbow",
+      "group": "Pipes",
+      "source": "pipes_spritesheet.jpg",
+      "sourceRect": [
+        844,
+        129,
+        1337,
+        626
+      ],
+      "size": [
+        493,
+        497
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEED0",
+      "components": 1,
+      "holesFilled": 12
+    },
+    {
+      "name": "pipe_dry",
+      "group": "Pipes",
+      "source": "pipes_spritesheet.jpg",
+      "sourceRect": [
+        1456,
+        127,
+        1981,
+        351
+      ],
+      "size": [
+        512,
+        218
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEED0",
+      "components": 1,
+      "holesFilled": 0
+    },
+    {
+      "name": "pipe_rusty",
+      "group": "Pipes",
+      "source": "pipes_spritesheet.jpg",
+      "sourceRect": [
+        2130,
+        130,
+        2649,
+        649
+      ],
+      "size": [
+        512,
+        512
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEED0",
+      "components": 1,
+      "holesFilled": 0
+    },
+    {
+      "name": "pipe_frozen",
+      "group": "Pipes",
+      "source": "pipes_spritesheet.jpg",
+      "sourceRect": [
+        114,
+        869,
+        674,
+        1200
+      ],
+      "size": [
+        512,
+        303
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEFCE",
+      "components": 1,
+      "holesFilled": 5
+    },
+    {
+      "name": "pipe_locked",
+      "group": "Pipes",
+      "source": "pipes_spritesheet.jpg",
+      "sourceRect": [
+        801,
+        866,
+        1324,
+        1328
+      ],
+      "size": [
+        512,
+        452
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEECE",
+      "components": 1,
+      "holesFilled": 31
+    },
+    {
+      "name": "pipe_leaking",
+      "group": "Pipes",
+      "source": "pipes_spritesheet.jpg",
+      "sourceRect": [
+        1474,
+        865,
+        1981,
+        1387
+      ],
+      "size": [
+        497,
+        512
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEECE",
+      "components": 5,
+      "holesFilled": 0
+    },
+    {
+      "name": "pipe_rotary_valve",
+      "group": "Pipes",
+      "source": "pipes_spritesheet.jpg",
+      "sourceRect": [
+        2120,
+        869,
+        2652,
+        1429
+      ],
+      "size": [
+        486,
+        512
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEECF",
+      "components": 1,
+      "holesFilled": 39
+    },
+    {
+      "name": "mascot_happy",
+      "group": "Mascot",
+      "source": "mascot_usta.jpg",
+      "sourceRect": [
+        139,
+        265,
+        993,
+        1356
+      ],
+      "size": [
+        601,
+        768
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FFE5B3",
+      "components": 1,
+      "holesFilled": 160
+    },
+    {
+      "name": "mascot_worried",
+      "group": "Mascot",
+      "source": "mascot_usta.jpg",
+      "sourceRect": [
+        1035,
+        789,
+        1951,
+        1873
+      ],
+      "size": [
+        649,
+        768
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FFE4B3",
+      "components": 15,
+      "holesFilled": 352
+    },
+    {
+      "name": "booster_xray",
+      "group": "UI",
+      "source": "gameplay_hud.jpg",
+      "sourceRect": [
+        216,
+        2303,
+        555,
+        2644
+      ],
+      "size": [
+        254,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEEC7",
+      "components": 1,
+      "holesFilled": 13
+    },
+    {
+      "name": "booster_hammer",
+      "group": "UI",
+      "source": "gameplay_hud.jpg",
+      "sourceRect": [
+        599,
+        2303,
+        937,
+        2643
+      ],
+      "size": [
+        254,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEEC7",
+      "components": 1,
+      "holesFilled": 11
+    },
+    {
+      "name": "booster_patch",
+      "group": "UI",
+      "source": "gameplay_hud.jpg",
+      "sourceRect": [
+        981,
+        2303,
+        1320,
+        2643
+      ],
+      "size": [
+        255,
+        256
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FFEEC7",
+      "components": 1,
+      "holesFilled": 13
+    },
+    {
+      "name": "icon_drop",
+      "group": "UI",
+      "source": "gameplay_hud.jpg",
+      "sourceRect": [
+        105,
+        100,
+        236,
+        268
+      ],
+      "size": [
+        100,
+        128
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#F7DFBA",
+      "components": 1,
+      "holesFilled": 0
+    },
+    {
+      "name": "btn_settings",
+      "group": "UI",
+      "source": "gameplay_hud.jpg",
+      "sourceRect": [
+        1256,
+        67,
+        1488,
+        302
+      ],
+      "size": [
+        190,
+        192
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "background": "#FEEEC8",
+      "components": 1,
+      "holesFilled": 7
+    }
+  ]
+}
