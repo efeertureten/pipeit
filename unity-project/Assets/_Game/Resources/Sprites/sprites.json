@@ -241,7 +241,8 @@
       ],
       "background": "#FEEEC7",
       "components": 1,
-      "holesFilled": 13
+      "holesFilled": 13,
+      "unity": false
     },
     {
       "name": "booster_hammer",
@@ -263,7 +264,8 @@
       ],
       "background": "#FEEEC7",
       "components": 1,
-      "holesFilled": 11
+      "holesFilled": 11,
+      "unity": false
     },
     {
       "name": "booster_patch",
@@ -285,7 +287,8 @@
       ],
       "background": "#FFEEC7",
       "components": 1,
-      "holesFilled": 13
+      "holesFilled": 13,
+      "unity": false
     },
     {
       "name": "icon_drop",
@@ -307,7 +310,8 @@
       ],
       "background": "#F7DFBA",
       "components": 1,
-      "holesFilled": 0
+      "holesFilled": 0,
+      "unity": false
     },
     {
       "name": "btn_settings",
@@ -329,7 +333,8 @@
       ],
       "background": "#FEEEC8",
       "components": 1,
-      "holesFilled": 7
+      "holesFilled": 7,
+      "unity": false
     }
   ]
 }

@@ -1,0 +1,336 @@
+{
+  "generatedBy": "tools/process_ai_art.py",
+  "sources": "reference-assets/",
+  "sprites": [
+    {
+      "name": "btn_green",
+      "source": "buttons_sheet .jpg",
+      "sourceRect": [
+        193,
+        128,
+        1855,
+        704
+      ],
+      "size": [
+        768,
+        266
+      ],
+      "background": "#FD36FE",
+      "specksRemoved": 1,
+      "holesFilled": 0,
+      "magentaResidue": 0.0,
+      "slice": {
+        "top": 85,
+        "right": 133,
+        "bottom": 112,
+        "left": 133
+      },
+      "unityBorder": [
+        133,
+        112,
+        133,
+        85
+      ]
+    },
+    {
+      "name": "btn_blue",
+      "source": "buttons_sheet .jpg",
+      "sourceRect": [
+        193,
+        741,
+        1855,
+        1326
+      ],
+      "size": [
+        768,
+        270
+      ],
+      "background": "#FD36FE",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0,
+      "slice": {
+        "top": 86,
+        "right": 135,
+        "bottom": 113,
+        "left": 135
+      },
+      "unityBorder": [
+        135,
+        113,
+        135,
+        86
+      ]
+    },
+    {
+      "name": "btn_red",
+      "source": "buttons_sheet .jpg",
+      "sourceRect": [
+        193,
+        1362,
+        1855,
+        1945
+      ],
+      "size": [
+        768,
+        269
+      ],
+      "background": "#FD36FE",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0,
+      "slice": {
+        "top": 86,
+        "right": 134,
+        "bottom": 113,
+        "left": 134
+      },
+      "unityBorder": [
+        134,
+        113,
+        134,
+        86
+      ]
+    },
+    {
+      "name": "panel_modal",
+      "source": "panel_modal.jpg",
+      "sourceRect": [
+        142,
+        143,
+        1906,
+        1905
+      ],
+      "size": [
+        768,
+        767
+      ],
+      "background": "#FE35FE",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0,
+      "slice": {
+        "top": 107,
+        "right": 92,
+        "bottom": 123,
+        "left": 92
+      },
+      "unityBorder": [
+        92,
+        123,
+        92,
+        107
+      ]
+    },
+    {
+      "name": "icon_drop",
+      "source": "drops_sheet.jpg",
+      "sourceRect": [
+        145,
+        499,
+        989,
+        1584
+      ],
+      "size": [
+        149,
+        192
+      ],
+      "background": "#FE31FD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "icon_drop_empty",
+      "source": "drops_sheet.jpg",
+      "sourceRect": [
+        1059,
+        499,
+        1903,
+        1584
+      ],
+      "size": [
+        149,
+        192
+      ],
+      "background": "#FE31FD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "coin",
+      "source": "coin_pill.jpg",
+      "sourceRect": [
+        365,
+        162,
+        1684,
+        1481
+      ],
+      "size": [
+        256,
+        256
+      ],
+      "background": "#FC01FD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "pill",
+      "source": "coin_pill.jpg",
+      "sourceRect": [
+        158,
+        1461,
+        1890,
+        1910
+      ],
+      "size": [
+        512,
+        133
+      ],
+      "background": "#FC01FD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0,
+      "slice": {
+        "top": 60,
+        "right": 66,
+        "bottom": 60,
+        "left": 66
+      },
+      "unityBorder": [
+        66,
+        60,
+        66,
+        60
+      ]
+    },
+    {
+      "name": "btn_settings",
+      "source": "btn_settings_raw.jpg",
+      "sourceRect": [
+        161,
+        158,
+        1887,
+        1884
+      ],
+      "size": [
+        256,
+        256
+      ],
+      "background": "#FE3CFD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "booster_xray",
+      "source": "booster_xray_raw.jpg",
+      "sourceRect": [
+        132,
+        132,
+        1916,
+        1916
+      ],
+      "size": [
+        384,
+        384
+      ],
+      "background": "#FD2BFD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "booster_hammer",
+      "source": "booster_hammer_raw.jpg",
+      "sourceRect": [
+        392,
+        310,
+        1656,
+        1739
+      ],
+      "size": [
+        340,
+        384
+      ],
+      "background": "#FD29FC",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "booster_patch",
+      "source": "booster_patch_raw.jpg",
+      "sourceRect": [
+        291,
+        270,
+        1757,
+        1778
+      ],
+      "size": [
+        373,
+        384
+      ],
+      "background": "#FC02FD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "mascot_drop_wave",
+      "source": "mascot_sheet.jpg",
+      "sourceRect": [
+        55,
+        678,
+        672,
+        1360
+      ],
+      "size": [
+        463,
+        512
+      ],
+      "background": "#FE23FD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "mascot_drop_sad",
+      "source": "mascot_sheet.jpg",
+      "sourceRect": [
+        770,
+        678,
+        1307,
+        1360
+      ],
+      "size": [
+        403,
+        512
+      ],
+      "background": "#FE23FD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.0
+    },
+    {
+      "name": "mascot_drop_happy",
+      "source": "mascot_sheet.jpg",
+      "sourceRect": [
+        1330,
+        678,
+        2018,
+        1360
+      ],
+      "size": [
+        512,
+        508
+      ],
+      "background": "#FE23FD",
+      "specksRemoved": 0,
+      "holesFilled": 0,
+      "magentaResidue": 0.00022
+    }
+  ]
+}

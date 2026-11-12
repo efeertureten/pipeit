@@ -116,6 +116,18 @@
   // =================================================================== colour helpers
   const INK = '#4A2E22';
   const UI_FONT = getComputedStyle(document.body).fontFamily || 'system-ui, sans-serif';
+  // AI UI art (tools/process_ai_art.py → assets/sprites/ui/). CSS 9-slices the panel/buttons/pill.
+  const UI_DIR = 'assets/sprites/ui/';
+  const UI_ART = {
+    drop: UI_DIR + 'icon_drop.png',
+    dropEmpty: UI_DIR + 'icon_drop_empty.png',
+    buddyWave: UI_DIR + 'mascot_drop_wave.png',
+    buddyHappy: UI_DIR + 'mascot_drop_happy.png',
+    buddySad: UI_DIR + 'mascot_drop_sad.png',
+  };
+  // warm the cache so the first lost drop / first modal never flashes empty
+  [...Object.values(UI_ART), ...['panel_modal', 'btn_green', 'btn_blue', 'btn_red', 'pill', 'coin'].map((n) => UI_DIR + n + '.png')]
+    .forEach((src) => { const im = new Image(); im.src = src; });
   const BRASS = '#C9A13B';
   const PAIR_TAGS = ['#E5484D', '#8E5BD9', '#2F9C9A', '#E8743B'];
   const THEME_STYLE = {
@@ -512,12 +524,14 @@
     el.classList.toggle('ftue', s.ftue);
     if (el.children.length !== slots) {
       el.innerHTML = '';
-      for (let i = 0; i < slots; i++) { const img = document.createElement('img'); img.src = 'assets/sprites/icon_drop.png'; img.alt = ''; el.appendChild(img); }
+      for (let i = 0; i < slots; i++) { const img = document.createElement('img'); img.src = UI_ART.drop; img.alt = ''; el.appendChild(img); }
     }
     [...el.children].forEach((img, i) => {
       const alive = i < s.leaks;
       const wasAlive = !img.classList.contains('lost');
       img.classList.toggle('lost', !alive);
+      const want = alive ? UI_ART.drop : UI_ART.dropEmpty; // full ↔ empty drop art
+      if (!img.src.endsWith(want)) img.src = want;
       if (alive) img.classList.remove('drain'); // drain keyframes use fill-mode:forwards
       if (lostAnim && wasAlive && !alive) { img.classList.remove('drain'); void img.offsetWidth; img.classList.add('drain'); }
       if (popAnim && alive && i === s.leaks - 1) { img.classList.remove('pop'); void img.offsetWidth; img.classList.add('pop'); }
@@ -1063,7 +1077,7 @@
   // =================================================================== overlays
   const overlay = $('#overlay');
   function showOverlay(html, onMount) {
-    overlay.innerHTML = `<div class="card">${html}</div>`;
+    overlay.innerHTML = `<div class="card"><div class="card-body">${html}</div></div>`;
     overlay.classList.remove('hidden');
     if (G.state === 'playing' || G.state === 'hammer') { setHammer(false); G.prevState = G.state; G.state = 'overlay'; }
     if (onMount) onMount(overlay);
@@ -1087,6 +1101,7 @@
     const nextRank = C.rankFor(n + 1) !== C.rankFor(n) ? `<p>Yeni rütbe: <span class="rank-badge">${C.rankFor(n + 1)}</span></p>` : '';
     const last = G.index >= G.order.length - 1 && !G.customLevel;
     showOverlay(`
+      <img class="buddy happy" src="${UI_ART.buddyHappy}" alt="">
       <img class="mascot happy" src="assets/sprites/mascot_happy.png" alt="Usta mutlu">
       <h2>${flawless ? 'Kusursuz İş, Usta!' : 'Harika İş!'}</h2>
       <p>Seviye ${n} tamam · <span class="rank-badge">${C.rankFor(n)}</span></p>
@@ -1110,6 +1125,7 @@
     const patches = Save.data.boosters.patch || 0;
     const patchOk = patches > 0 && (C.boosterUnlocked('patch', G.session.levelNumber) || G.customLevel);
     showOverlay(`
+      <img class="buddy sad" src="${UI_ART.buddySad}" alt="">
       <img class="mascot worried" src="assets/sprites/mascot_worried.png" alt="Usta endişeli">
       <h2>Eyvah, Su Kaçtı!</h2>
       <p>Damlalar bitti. Depoda hâlâ %${Math.round(G.session.waterRatio * 100)} su var.</p>
@@ -1163,7 +1179,7 @@
     const info = BOOSTER_INFO[b];
     const price = C.BOOSTERS[b].price;
     showOverlay(`
-      <img class="sprite" src="assets/sprites/booster_${b}.png" alt="">
+      <img class="sprite" src="${UI_DIR}booster_${b}.png" alt="">
       <h2>${info.name}</h2><p>${info.desc}</p>
       <div class="btns">
         <button class="btn" id="bs-buy" ${Save.data.coins < price ? 'disabled' : ''}>Satın Al<small>${price} jeton (sende ${Save.data.coins})</small></button>
@@ -1255,7 +1271,7 @@
     return MECHANIC_INTROS.find((m) => m.level === n && G.session.board.pipes.some((p) => p.type === m.type)) || null;
   }
   function showMechanicIntro(intro) {
-    showOverlay(`<p class="rank-badge">Yeni Boru</p><img class="sprite" src="assets/sprites/${intro.sprite}.png" alt=""><h2>${intro.title}</h2><p>${intro.text}</p>
+    showOverlay(`<img class="buddy wave" src="${UI_ART.buddyWave}" alt=""><p class="rank-badge">Yeni Boru</p><img class="sprite" src="assets/sprites/${intro.sprite}.png" alt=""><h2>${intro.title}</h2><p>${intro.text}</p>
       <div class="btns"><button class="btn green" id="mi-ok">Anladım!</button></div>`, () => {
       bind('#mi-ok', () => {
         Save.data.seenIntro[intro.type] = true; Save.save();

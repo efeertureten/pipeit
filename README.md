@@ -36,7 +36,13 @@ npm run validate        # every shipped level: schema, 100% solvable, replay, bo
 npm run levels          # regenerate the pack into web-playable/levels AND unity-project/.../Resources/Levels
 npm run test:cs         # compile the Unity C# headless (Roslyn on a .NET 6+ runtime) + 88 NUnit tests + C#↔JS cross-check
 npm run sprites         # re-slice the reference sheets into transparent sprites (needs Python + Pillow)
+npm run sprites:ai      # key the AI UI art (magenta JPGs) into transparent UI sprites (needs Pillow + numpy)
+npm run ui:shots        # headless-Chrome screenshots of the web playable → ui-shots/
 ```
+
+> **Python dependencies:** `python -m pip install pillow numpy`. `slice_sprites.py` only needs Pillow;
+> `process_ai_art.py` also needs numpy. On Windows the npm scripts call `python`. If that resolves to the
+> Microsoft Store stub, use `py tools/process_ai_art.py` instead.
 
 `web-playable/index.html` also opens straight from disk (`file://`). Browsers block `fetch()` of local JSON there, so the
 page falls back to `levels/levels.bundle.js`, which holds the same data.
@@ -262,6 +268,43 @@ soft, colour-decontaminated alpha edge. The output goes to `web-playable/assets/
   `pipe_rotary_valve`. These are used on the mechanic intro cards.
 - Mascot: `mascot_happy` (win screen) and `mascot_worried` (lose screen).
 - HUD (from `gameplay_hud.jpg`): `booster_xray`, `booster_hammer`, `booster_patch`, `icon_drop`, `btn_settings`.
+  These go to the web folder only; Unity's `Sprites/UI/` is owned by the AI art pipeline below.
+
+### AI UI art (`tools/process_ai_art.py`)
+
+The UI art sources are AI-generated JPGs on a magenta background in `reference-assets/`: `buttons_sheet .jpg`
+(the space in the name is deliberate and handled), `panel_modal.jpg`, `drops_sheet.jpg`, `coin_pill.jpg`,
+`btn_settings_raw.jpg`, `booster_{xray,hammer,patch}_raw.jpg` and `mascot_sheet.jpg`. `pipes_ai_sheet.jpg` is
+intentionally unused.
+
+JPEG block noise and chroma bleed rule out a single-colour key, so each pixel gets a soft key:
+**hue band 285–325° × saturation ramp × max(CIELAB ΔE to the measured background, same-chroma bright
+shadow)**, thresholded as a range. Warm pinks are protected because they fall outside the hue band:
+mascot cheeks are around 356°, hammer and coin sparkles 10–25°. Cleanup after keying:
+
+- connected-component speck and pinhole removal
+- the shared soft-alpha edge from `slice_sprites.py`
+- a 1px erode + feather
+- colour un-blending (`slice_sprites.unblend`)
+- magenta despill on the edge band only, where R and B are pulled down to G; interior colours are untouched
+
+The coin and pill touch on their sheet, so each gets a fitted circle or stadium mask.
+
+| Output (`web-playable/assets/sprites/ui/` + `unity-project/Assets/_Game/Resources/Sprites/UI/`) | Source |
+|---|---|
+| `btn_green`, `btn_blue`, `btn_red` (9-slice) | `buttons_sheet .jpg` |
+| `panel_modal` (9-slice) | `panel_modal.jpg` |
+| `icon_drop`, `icon_drop_empty` | `drops_sheet.jpg` |
+| `coin`, `pill` (9-slice) | `coin_pill.jpg` |
+| `btn_settings`, `booster_xray`, `booster_hammer`, `booster_patch` | `*_raw.jpg` |
+| `mascot_drop_wave`, `mascot_drop_sad`, `mascot_drop_happy` | `mascot_sheet.jpg` |
+
+`ui_sprites.json` records sizes, source rects, measured background, a magenta-residue halo metric
+(currently ≤ 0.022 %) and 9-slice borders: CSS `border-image` order plus Unity `Sprite.border` order.
+
+Before anything is replaced, the HUD sprites they supersede are copied once to
+`web-playable/assets/sprites/_orig/` (Unity copies under `_orig/unity/`). Existing backups are never
+overwritten. Halo-check previews on dark and light backgrounds are written to `ui-shots/ai_art_preview_*.png`.
 
 ## Verification status
 

@@ -102,6 +102,30 @@ def distance_map(img: Image.Image, bg) -> Image.Image:
     return ImageChops.lighter(ImageChops.lighter(r, g), b)
 
 
+def soft_alpha(mask_img: Image.Image, d: Image.Image, lo: int = None, hi: int = None) -> Image.Image:
+    """Soft alpha edge (shared with tools/process_ai_art.py).
+
+    mask_img: L image, 255 = sprite.  d: L image, 0 = pure background … 255 = pure sprite colour.
+    The mask core (eroded 2px) is fully opaque; the 1px-dilated fringe gets a linear ramp of `d`
+    between lo and hi, so anti-aliased JPEG edges become partial alpha instead of a hard cut.
+    """
+    lo = EDGE_LO if lo is None else lo
+    hi = EDGE_HI if hi is None else hi
+    inner = mask_img.filter(ImageFilter.MinFilter(5))       # solid core (eroded 2px)
+    outer = mask_img.filter(ImageFilter.MaxFilter(3))       # fringe reach (dilated 1px)
+    ramp = [0 if v <= lo else 255 if v >= hi else int((v - lo) * 255 / (hi - lo)) for v in range(256)]
+    soft = ImageChops.multiply(outer, d.point(ramp))
+    return ImageChops.lighter(inner, soft)
+
+
+def unblend(p, a255, bg):
+    """Colour decontamination: p = a*c + (1-a)*bg  =>  c = bg + (p-bg)/a  (alpha a255 in 1..255).
+
+    Works on plain numbers (slice_sprites) and on numpy arrays (process_ai_art) alike.
+    """
+    return bg + (p - bg) * (255.0 / a255)
+
+
 def label(work: bytearray, w: int, h: int):
     """4-connected components over `work` (1 = member). Consumes `work`. Returns list of pixel-index lists."""
     n = w * h
@@ -219,11 +243,7 @@ def slice_sprite(spec: dict, cache: dict) -> tuple[Image.Image, dict]:
 
     # ---- soft alpha + decontamination ---------------------------------------------
     mask_img = Image.frombytes("L", (w, h), bytes(255 if v else 0 for v in mask))
-    inner = mask_img.filter(ImageFilter.MinFilter(5))       # solid core (eroded 2px)
-    outer = mask_img.filter(ImageFilter.MaxFilter(3))       # fringe reach (dilated 1px)
-    ramp = [0 if v <= EDGE_LO else 255 if v >= EDGE_HI else int((v - EDGE_LO) * 255 / (EDGE_HI - EDGE_LO)) for v in range(256)]
-    soft = ImageChops.multiply(outer, d.point(ramp))
-    alpha = ImageChops.lighter(inner, soft)
+    alpha = soft_alpha(mask_img, d)
     abytes = alpha.tobytes()
 
     out = bytearray(4 * n)
@@ -235,10 +255,9 @@ def slice_sprite(spec: dict, cache: dict) -> tuple[Image.Image, dict]:
             continue
         pr, pg, pb = rgb[o3], rgb[o3 + 1], rgb[o3 + 2]
         if a < 255:
-            k = 255.0 / a       # un-blend: p = a*c + (1-a)*bg  =>  c = bg + (p-bg)/a
-            pr = min(255, max(0, int(br + (pr - br) * k)))
-            pg = min(255, max(0, int(bgc + (pg - bgc) * k)))
-            pb = min(255, max(0, int(bb + (pb - bb) * k)))
+            pr = min(255, max(0, int(unblend(pr, a, br))))
+            pg = min(255, max(0, int(unblend(pg, a, bgc))))
+            pb = min(255, max(0, int(unblend(pb, a, bb))))
         out[o4] = pr; out[o4 + 1] = pg; out[o4 + 2] = pb; out[o4 + 3] = a
 
     rgba = Image.frombytes("RGBA", (w, h), bytes(out))
@@ -268,17 +287,17 @@ def slice_sprite(spec: dict, cache: dict) -> tuple[Image.Image, dict]:
     return rgba, meta
 
 
-def contact_sheet(images: list[tuple[str, Image.Image]], path: str) -> None:
-    cell = 300
-    cols = 5
+def contact_sheet(images: list[tuple[str, Image.Image]], path, bg=(40, 44, 52), checker=True, cell: int = 300, cols: int = 5) -> None:
+    """Thumbnail grid on a solid / checkerboard background (halo check). Shared with process_ai_art.py."""
     rows = (len(images) + cols - 1) // cols
-    sheet = Image.new("RGB", (cols * cell, rows * cell), (40, 44, 52))
+    sheet = Image.new("RGB", (cols * cell, rows * cell), bg)
     # checkerboard so transparency + halos are obvious
     tile = 16
-    for y in range(0, sheet.height, tile):
-        for x in range(0, sheet.width, tile):
-            if (x // tile + y // tile) % 2:
-                sheet.paste((70, 74, 84), (x, y, x + tile, y + tile))
+    alt = tuple(min(255, c + 30) if sum(bg) < 384 else max(0, c - 18) for c in bg)
+    for y in range(0, sheet.height, tile if checker else sheet.height):
+        for x in range(0, sheet.width, tile if checker else sheet.width):
+            if checker and (x // tile + y // tile) % 2:
+                sheet.paste(alt, (x, y, x + tile, y + tile))
     for i, (_, im) in enumerate(images):
         th = im.copy()
         th.thumbnail((cell - 20, cell - 20), Image.LANCZOS)
@@ -302,11 +321,16 @@ def main() -> int:
             continue
         im, meta = slice_sprite(spec, cache)
         web_path = os.path.join(OUT_WEB, spec["name"] + ".png")
-        unity_dir = os.path.join(OUT_UNITY, spec["group"])
         os.makedirs(OUT_WEB, exist_ok=True)
-        os.makedirs(unity_dir, exist_ok=True)
         im.save(web_path, optimize=True)
-        im.save(os.path.join(unity_dir, spec["name"] + ".png"), optimize=True)
+        # Unity Resources/Sprites/UI/ is owned by tools/process_ai_art.py (dedicated UI art);
+        # the HUD icons cut from gameplay_hud.jpg only feed the web playable.
+        if spec["group"] != "UI":
+            unity_dir = os.path.join(OUT_UNITY, spec["group"])
+            os.makedirs(unity_dir, exist_ok=True)
+            im.save(os.path.join(unity_dir, spec["name"] + ".png"), optimize=True)
+        else:
+            meta["unity"] = False
         manifest.append(meta)
         images.append((spec["name"], im))
         print(f"  {spec['name']:<20} {im.width:>4}x{im.height:<4}  bg={meta['background']}  "

@@ -10,7 +10,9 @@
     "validate": "node tools/validate_levels.mjs",
     "test": "node --test tools/tests/",
     "test:cs": "node tools/run_csharp_tests.mjs",
-    "sprites": "python tools/slice_sprites.py --preview"
+    "sprites": "python tools/slice_sprites.py --preview",
+    "sprites:ai": "python tools/process_ai_art.py",
+    "ui:shots": "node tools/ui_shots.mjs"
   },
   "engines": {
     "node": ">=18"
