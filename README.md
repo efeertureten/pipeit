@@ -27,6 +27,9 @@ level files, and the C# solver reproduces every metric and solution of the JS so
 
 ## Quick start
 
+**Play in the browser:** <https://efeertureten.github.io/pipeit/> (GitHub Pages, redeployed from `web-playable/` on
+every push to `main` by [`.github/workflows/pages.yml`](.github/workflows/pages.yml)).
+
 ```bash
 npm run play            # zero-dependency static server → http://localhost:8080
                         #   ?dev=1      metrics panel, auto-solve (S), level stepping (N/P), drop a level JSON to play it
