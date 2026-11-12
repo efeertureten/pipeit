@@ -1,0 +1,20 @@
+{
+  "name": "su-ustasi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Su Ustası (Flush Master) — one-touch tap-to-remove pipe puzzle. Unity 2D URP codebase + zero-dependency HTML5 playable.",
+  "scripts": {
+    "play": "node tools/serve.mjs",
+    "levels": "node tools/generate_levels.mjs",
+    "levels:dry": "node tools/generate_levels.mjs --dry",
+    "validate": "node tools/validate_levels.mjs",
+    "test": "node --test tools/tests/",
+    "test:cs": "node tools/run_csharp_tests.mjs",
+    "sprites": "python tools/slice_sprites.py --preview",
+    "sprites:ai": "python tools/process_ai_art.py",
+    "ui:shots": "node tools/ui_shots.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
