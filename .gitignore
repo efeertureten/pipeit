@@ -16,3 +16,7 @@ unity-project/*.csproj
 unity-project/*.sln
 unity-project/.vs/
 unity-project/.idea/
+
+# local backups / generated screenshots
+tools.zip
+ui-shots/
