@@ -70,8 +70,24 @@ img { -webkit-user-drag: none; user-select: none; }
   filter: drop-shadow(0 3px 0 rgba(17, 32, 80, .22));
 }
 .coins .coin-icon { position: absolute; left: -10px; top: 50%; width: 44px; height: 44px; transform: translateY(-50%); }
-.coin-icon { width: 22px; height: 22px; display: inline-block; flex: none; background: url("../assets/sprites/ui/coin.png") center / contain no-repeat; }
+.coin-icon { width: 22px; height: 22px; display: inline-block; flex: none; background: url("../assets/sprites/ui/coin.png") center / contain no-repeat; vertical-align: middle; }
+.coin-icon.sm { width: 18px; height: 18px; }
 .coins.bump { animation: pop .4s; }
+
+/* currency row (hearts + coins) and right-side HUD buttons */
+.currency-row { display: inline-flex; gap: 8px; align-items: center; justify-content: center; margin-top: 8px; }
+.hearts {
+  display: inline-flex; align-items: center; gap: 4px; height: 38px; padding: 0 12px; font-weight: 900; font-size: 15px;
+  color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.35); background: none; border: 0;
+  border-image: url("../assets/sprites/ui/pill.png") 60 66 fill / 50% 19px / 0 stretch; filter: drop-shadow(0 3px 0 rgba(17,32,80,.22));
+}
+.hearts .heart-icon { color: #FF5A7A; font-size: 17px; filter: drop-shadow(0 1px 0 rgba(0,0,0,.2)); }
+.hearts.full .heart-icon { color: #FF3D63; }
+.hearts.infinite .heart-icon { color: #7FE3FF; }
+.hearts .heart-timer { font-size: 11px; opacity: .9; font-weight: 800; }
+.hearts .heart-timer:empty { display: none; }
+.hud-right { display: flex; gap: 6px; align-items: flex-start; }
+.icon-btn .glyph { font-size: 30px; line-height: 64px; }
 
 .icon-btn { background: none; border: 0; padding: 0; width: 64px; height: 64px; border-radius: 50%; transition: transform .12s; filter: drop-shadow(0 3px 0 rgba(17, 32, 80, .22)); }
 .icon-btn img { width: 100%; height: 100%; object-fit: contain; }
@@ -219,6 +235,74 @@ img { -webkit-user-drag: none; user-select: none; }
 .dev.collapsed .dev-body { display: none; }
 .dev summary, .dev .dev-head { cursor: pointer; font-weight: 700; }
 .dev button { font: inherit; margin: 4px 4px 0 0; padding: 2px 8px; border-radius: 6px; border: 1px solid #5b6577; background: #2d3442; color: #e6edf3; }
+
+/* ------------------------------------------------------------------ meta screens */
+.muted { color: var(--navy-soft); font-size: 13px; }
+.btn.big { min-height: 72px; font-size: 22px; }
+.btn.yellow { border-image-source: url("../assets/sprites/ui/btn_green.png"); border-image-slice: 85 133 112 133 fill; filter: hue-rotate(-35deg) saturate(1.3); }
+.bag-item { display: inline-flex; align-items: center; gap: 3px; margin: 0 5px; font-weight: 800; color: var(--navy); white-space: nowrap; }
+
+/* home hub */
+.home { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.home-top { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.home-currency { display: inline-flex; align-items: center; gap: 5px; background: #fff; border: 2px solid rgba(17,32,80,.14); border-radius: 999px; padding: 5px 12px; font-weight: 900; color: var(--navy); font-size: 15px; }
+.home-currency .heart-icon { color: #FF3D63; }
+.home-currency small { font-weight: 700; color: var(--navy-soft); font-size: 11px; }
+.home .mascot { height: min(22vh, 180px); margin: 0 auto; }
+.home h2 { margin: 0; }
+.pass-banner { width: 100%; border: 0; background: linear-gradient(100deg, #6A4DF0, #9B6CF5); color: #fff; font-weight: 900; border-radius: 16px; padding: 12px 14px; box-shadow: 0 4px 0 #4A33B0; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.pass-banner.active { background: linear-gradient(100deg, #2F9C9A, #46C3A0); box-shadow: 0 4px 0 #1E6E6C; }
+.pass-banner span { opacity: .9; font-size: 12px; white-space: nowrap; }
+.home-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; margin-top: 4px; }
+.hb { position: relative; background: #fff; border: 3px solid var(--navy); border-radius: 16px; box-shadow: 0 4px 0 var(--navy); padding: 12px 4px 10px; font-size: 26px; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--navy); }
+.hb span { font-size: 12px; font-weight: 800; }
+.hb:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--navy); }
+.hb-badge { position: absolute; top: -8px; right: -6px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px; background: var(--error); color: #fff; font-size: 12px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 2px 0 rgba(17,32,80,.3); }
+
+/* shop extras */
+.shop-list { max-height: 54vh; overflow: auto; }
+.shop-item.highlight { border-color: var(--yellow); background: #FFF7D6; box-shadow: 0 0 0 2px var(--yellow) inset; }
+.shop-ico { font-size: 30px; width: 44px; text-align: center; }
+.shop-tag { display: inline-block; background: var(--error); color: #fff; font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 999px; margin-right: 6px; vertical-align: middle; }
+.shop-tag.popular { background: var(--teal); } .shop-tag.best { background: #6A4DF0; } .shop-tag.sub { background: #9B6CF5; } .shop-tag.offer { background: var(--orange); }
+.chan { display: inline-block; font-size: 10px; font-weight: 800; color: var(--navy-soft); border: 1px solid rgba(17,32,80,.25); border-radius: 6px; padding: 0 5px; margin-left: 4px; }
+.chan.web { color: #6A4DF0; border-color: #6A4DF0; }
+
+/* daily */
+.daily-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin: 10px 0; }
+.daily-day { border: 2px solid rgba(17,32,80,.18); border-radius: 12px; padding: 7px 2px; background: #fff; font-size: 11px; }
+.daily-day .dd-reward { margin-top: 3px; font-size: 11px; }
+.daily-day.claimed { background: #E6E9F2; opacity: .6; }
+.daily-day.today { border-color: var(--green); box-shadow: 0 0 0 2px var(--green) inset; animation: pulse 1.4s infinite; }
+
+/* reveal (chest / wheel) */
+.reveal { min-height: 30px; display: grid; place-items: center; margin: 8px 0; }
+.reveal-in { font-size: 18px; animation: cardIn .5s ease-out; background: #FFF7D6; border: 3px solid var(--navy); border-radius: 14px; padding: 8px 14px; }
+.chest-big { font-size: 64px; filter: drop-shadow(0 6px 0 rgba(17,32,80,.18)); }
+.chest-big.ready { animation: bounce 1.1s ease-in-out infinite; }
+
+/* wheel */
+.wheel-wrap { position: relative; width: min(60vw, 240px); aspect-ratio: 1; margin: 8px auto; }
+.wheel { width: 100%; height: 100%; border-radius: 50%; border: 6px solid var(--navy); position: relative; box-shadow: 0 6px 0 rgba(17,32,80,.25); transform: rotate(0deg); }
+.wheel-pointer { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 26px; color: var(--error); z-index: 2; filter: drop-shadow(0 2px 0 rgba(0,0,0,.2)); }
+.wheel-label { position: absolute; inset: 0; display: flex; justify-content: center; }
+.wheel-label span { margin-top: 10px; font-size: 11px; font-weight: 900; color: var(--navy); }
+
+/* arena */
+.arena-list { display: grid; gap: 5px; max-height: 42vh; overflow: auto; margin: 8px 0; }
+.arena-row { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 8px; background: #fff; border: 2px solid rgba(17,32,80,.14); border-radius: 12px; padding: 7px 10px; font-weight: 800; }
+.arena-row.me { border-color: var(--green); background: #EAFBEF; }
+.ar-rank { font-weight: 900; text-align: center; color: var(--navy-soft); }
+.ar-rank.top { color: var(--yellow); }
+.ar-name { text-align: left; }
+.ar-score { color: var(--teal); white-space: nowrap; }
+.tier { display: inline-block; margin: 0 6px; }
+
+/* magic pass */
+.pass-hero { font-size: 58px; }
+.perks { display: grid; gap: 8px; margin: 12px 0; text-align: left; }
+.perk { background: #F3EEFF; border: 2px solid #CBB6F5; border-radius: 12px; padding: 9px 12px; font-weight: 800; color: #4A33B0; }
+.chest-note { background: #FFF7D6; border: 2px solid var(--yellow); border-radius: 12px; padding: 6px 10px; font-weight: 800; }
 
 /* ------------------------------------------------------------------ keyframes */
 @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }

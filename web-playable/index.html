@@ -15,9 +15,15 @@
       <div class="level-info">
         <div class="level-title" id="level-title">Su Ustası</div>
         <div class="level-sub" id="level-sub"></div>
-        <button class="coins" id="coins" type="button" title="Mağaza"><span class="coin-icon"></span><span id="coin-count">0</span></button>
+        <div class="currency-row">
+          <button class="hearts" id="hearts" type="button" title="Canlar"><span class="heart-icon">❤</span><span id="heart-count">5</span><span class="heart-timer" id="heart-timer"></span></button>
+          <button class="coins" id="coins" type="button" title="Mağaza"><span class="coin-icon"></span><span id="coin-count">0</span></button>
+        </div>
       </div>
-      <button class="icon-btn" id="btn-settings" type="button" aria-label="Ayarlar"><img src="assets/sprites/ui/btn_settings.png" alt=""></button>
+      <div class="hud-right">
+        <button class="icon-btn" id="btn-home" type="button" aria-label="Ana Menü"><span class="glyph">🏠</span></button>
+        <button class="icon-btn" id="btn-settings" type="button" aria-label="Ayarlar"><img src="assets/sprites/ui/btn_settings.png" alt=""></button>
+      </div>
     </header>
 
     <main class="board-wrap" id="board-wrap">
@@ -39,6 +45,7 @@
   </div>
 
   <script src="js/core.js"></script>
+  <script src="js/economy.js"></script>
   <script src="js/solver.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/game.js"></script>

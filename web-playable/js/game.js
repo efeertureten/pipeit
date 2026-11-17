@@ -6,6 +6,7 @@
 (function () {
   'use strict';
   const C = window.SuCore;
+  const EC = window.SuEconomy;
   const S = window.SuSolver;
   const A = window.SuAudio;
   const $ = (sel) => document.querySelector(sel);
@@ -13,13 +14,14 @@
   const DEV = params.has('dev');
 
   // =================================================================== persistence (ISaveService mock)
+  // Save owns progression + settings; the meta-economy (coins, boosters, lives, shop, …) lives in
+  // the server-authoritative Meta engine (economy.js) with its own signed/cloud stores.
   const SAVE_KEY = 'suUstasi.save.v1';
   const Save = {
     data: null,
     defaults() {
       return {
-        coins: C.ECONOMY.startCoins, maxIndex: 0, completed: {}, boosters: Object.assign({}, C.ECONOMY.startBoosters),
-        sound: true, seenIntro: {}, boosterGift: {}, noAds: false, ftue: {}, stats: { wins: 0, fails: 0 },
+        maxIndex: 0, completed: {}, sound: true, seenIntro: {}, boosterGift: {}, ftue: {}, stats: { wins: 0, fails: 0 },
       };
     },
     load() {
@@ -31,6 +33,22 @@
     save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); } catch (e) { /* ignore */ } },
     reset() { this.data = this.defaults(); this.save(); },
   };
+
+  // =================================================================== meta-economy engine (server-authoritative)
+  const Meta = EC.createMeta({ hooks: { onUsed: (type, how) => trackBooster(type, how) } });
+  const INV = Meta.inventory;
+  // one-time migration: fold a legacy flat save's coins/boosters into the new economy
+  (function migrateLegacy() {
+    let legacy = null;
+    try { legacy = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { /* ignore */ }
+    if (!legacy || legacy.__metaMigrated) return;
+    const bag = {};
+    if (typeof legacy.coins === 'number' && legacy.coins > C.ECONOMY.startCoins) bag.coin = legacy.coins - C.ECONOMY.startCoins;
+    if (legacy.boosters) for (const b of EC.BOOSTERS) { const extra = (legacy.boosters[b] || 0) - (C.ECONOMY.startBoosters[b] || 0); if (extra > 0) bag[b] = extra; }
+    if (Object.keys(bag).length) INV.earn('migrate:legacy', bag);
+    if (legacy.noAds) INV.earn('migrate:noads', { noAdsMs: Infinity });
+    try { legacy.__metaMigrated = true; localStorage.setItem(SAVE_KEY, JSON.stringify(legacy)); } catch (e) { /* ignore */ }
+  })();
 
   // =================================================================== analytics / ads / iap (mock services)
   const Analytics = {
@@ -47,12 +65,8 @@
 
   const adPolicy = new C.AdPolicy();
   const nowSec = () => performance.now() / 1000;
-
-  const IAP_PRODUCTS = [
-    { id: 'coins_500', title: '500 Jeton', price: 29.99, coins: 500 },
-    { id: 'coins_1500', title: '1500 Jeton', price: 69.99, coins: 1500 },
-    { id: 'no_ads', title: 'Reklamsız', price: 49.99, noAds: true },
-  ];
+  const fmtTRY = (v) => (v === Infinity ? '—' : v.toFixed(2).replace('.', ',') + ' ₺');
+  function fmtClock(sec) { sec = Math.max(0, sec | 0); const h = (sec / 3600) | 0, m = ((sec % 3600) / 60) | 0, s = sec % 60; return (h ? h + 's ' : '') + (h || m ? (m < 10 && h ? '0' : '') + m + 'dk ' : '') + (h ? '' : (s < 10 ? '0' : '') + s + 'sn'); }
 
   // =================================================================== state
   const G = {
@@ -206,6 +220,22 @@
   }
 
   // =================================================================== game flow (web GameStateMachine)
+  function levelNumFor(index, rawOverride) {
+    if (rawOverride) return rawOverride.level || 999;
+    return G.order[Math.max(0, Math.min(index, G.order.length - 1))].level;
+  }
+  function chargesLife(index, rawOverride) { return !rawOverride && !DEV && levelNumFor(index, rawOverride) > C.RULES.ftueLevels; }
+
+  /** Player-facing entry point: charges one meta life (unless FTUE / custom / dev), blocks when empty. */
+  function playLevel(index, rawOverride) {
+    if (chargesLife(index, rawOverride)) {
+      if (INV.lives() <= 0) { showOutOfLives(() => playLevel(index, rawOverride)); return false; }
+      INV.spend('level:start', 'life', 1); // server-authoritative; no-op while lives are limitless
+    }
+    startLevel(index, rawOverride);
+    return true;
+  }
+
   function startLevel(index, rawOverride) {
     clearTimers();
     G.customLevel = !!rawOverride;
@@ -249,20 +279,24 @@
     const n = G.session.levelNumber;
     const reward = C.winReward(n, G.session.mistakes);
     later(() => { G.drain = { t0: nowSec(), from: G.tankShown }; A.drain(); }, 450);
+    let chestAwarded = false;
     later(() => {
       if (!G.customLevel) {
-        Save.data.coins += reward.total;
         Save.data.completed[n] = true;
         Save.data.maxIndex = Math.max(Save.data.maxIndex, Math.min(G.index + 1, G.order.length - 1));
         Save.data.stats.wins++;
         Save.save();
+        // reward goes to the pending buffer; it's applied when the win card's coin animation plays
+        INV.pending({ coin: reward.total });
+        if (Save.data.stats.wins % Meta.config.chest.winEvery === 0) { INV.earn('win:chest', { chest: 1 }); chestAwarded = true; }
+        Meta.arena.submit(Object.keys(Save.data.completed).length); // weekly arena = levels cleared
       }
       Analytics.track('level_complete', {
         level: n, mistakes: G.session.mistakes, taps: G.session.taps, leaksLeft: G.session.leaks,
         seconds: Math.round(nowSec() - G.startedAt), boostersUsed: G.boostersUsed, coins: reward.total,
       });
       if (n === C.RULES.ftueLevels) ftueStep('ftue_complete');
-      showWin(reward);
+      showWin(reward, chestAwarded);
     }, 1900);
   }
 
@@ -283,8 +317,8 @@
 
   function nextLevel() {
     const n = G.session ? G.session.levelNumber : 0;
-    const proceed = () => startLevel(G.customLevel ? G.index : G.index + 1);
-    if (!G.customLevel && !Save.data.noAds && adPolicy.onLevelWin(n, nowSec())) {
+    const proceed = () => playLevel(G.customLevel ? G.index : G.index + 1, G.customLevel ? G.raw : null);
+    if (!G.customLevel && !INV.hasLimitless('noAds') && adPolicy.onLevelWin(n, nowSec())) {
       showInterstitial('level_complete', () => { adPolicy.markShown(nowSec()); proceed(); });
     } else proceed();
   }
@@ -442,27 +476,40 @@
     const n = G.session.levelNumber;
     if (!C.boosterUnlocked(b, n) && !G.customLevel) { toast(`${BOOSTER_INFO[b].name} ${C.BOOSTERS[b].unlock}. seviyede açılır.`); return; }
     if (b === 'hammer' && G.state === 'hammer') { setHammer(false); return; }
-    if ((Save.data.boosters[b] || 0) <= 0) { showBoosterShop(b); return; }
+
+    // Patch has a game-state gate (board not already at max leaks); Hammer defers its spend to the
+    // successful removal, so here we only check affordability and arm. X-Ray/Patch spend on activate.
+    const cost = Meta.boosters.resolveCost(b);
+    if (!cost.affordable) { showBoosterShop(b); return; }
+
     if (b === 'xray') {
-      Save.data.boosters.xray--; Save.save();
+      Meta.boosters.spend('xray', cost.how); G.hand = null;
+      trackBooster('xray', cost.how);
       G.xrayUntil = nowSec() + C.TIMING.xrayDuration;
       A.xray();
-      trackBooster('xray');
+      if (cost.how === 'coins') toast(`${cost.price} jetonla Röntgen kullanıldı.`);
       if (!G.session.exitablePipeIds().length) toast('Şu an çıkabilen boru yok — önce pası kır ya da vanayı çevir.');
     } else if (b === 'hammer') {
+      G.hammerHow = cost.how;
       setHammer(true);
-      toast('Kırmak istediğin boruya dokun.');
+      toast(cost.how === 'coins' ? `Çekiç ${cost.price} jeton — kırmak istediğin boruya dokun.` : 'Kırmak istediğin boruya dokun.');
     } else if (b === 'patch') {
       if (!G.session.patch()) { toast('Damlalar zaten dolu (en fazla 4).'); return; }
-      Save.data.boosters.patch--; Save.save();
+      Meta.boosters.spend('patch', cost.how);
+      trackBooster('patch', cost.how);
       A.patch();
-      trackBooster('patch');
+      if (cost.how === 'coins') toast(`${cost.price} jetonla Yama kullanıldı.`);
       renderLives(false, true);
     }
     updateHud();
   }));
 
-  function trackBooster(b) { G.boostersUsed++; Analytics.track('booster_used', { booster: b, level: G.session.levelNumber, left: Save.data.boosters[b] }); }
+  // The server-authoritative Spend (reason 'booster:*') is itself the backend tracking the engine
+  // logs for anti-cheat cross-check; this is the client-side analytics mirror.
+  function trackBooster(b, how) {
+    G.boostersUsed++;
+    Analytics.track('booster_used', { booster: b, level: G.session ? G.session.levelNumber : 0, left: INV.boosterCount(b), paid: how || 'stock' });
+  }
 
   function setHammer(on) {
     if (on && G.state === 'playing') G.state = 'hammer';
@@ -475,10 +522,10 @@
     const res = G.session.hammer(pipe.id);
     setHammer(false);
     if (!res) return;
-    Save.data.boosters.hammer--; Save.save();
+    Meta.boosters.spend('hammer', G.hammerHow || 'stock');   // deferred spend: only on a real removal
+    trackBooster('hammer', G.hammerHow || 'stock');
     A.hammer();
     burst(pipe, C.pipeColorHex(pipe.type, pipe.index, G.session.hasLeaking, pipe.rustIntact), 26, 1.6);
-    trackBooster('hammer');
     G.pendingValves = G.pendingValves.filter((v) => v.id !== pipe.id);
     handleEvents(res.events);
     updateHud();
@@ -488,8 +535,8 @@
     for (const b of Object.keys(C.BOOSTERS)) {
       if (n === C.BOOSTERS[b].unlock && !Save.data.boosterGift[b] && !G.customLevel) {
         Save.data.boosterGift[b] = true;
-        Save.data.boosters[b] = (Save.data.boosters[b] || 0) + 1;
         Save.save();
+        INV.earn('gift:unlock', { [b]: 1 });
         later(() => toast(`Yeni güçlendirici: ${BOOSTER_INFO[b].name}! 1 tane hediye. ${BOOSTER_INFO[b].desc}`, 4200), 600);
       }
     }
@@ -498,22 +545,35 @@
 
   // =================================================================== HUD
   function updateHud() {
+    updateHearts();
+    $('#coin-count').textContent = INV.coins;
     if (!G.session) return;
     const n = G.session.levelNumber;
     $('#level-title').textContent = `Seviye ${n}`;
     $('#level-sub').textContent = `${C.themeFor(n)} · ${C.rankFor(n)}${C.isBreather(n) ? ' · Mola' : ''}`;
-    $('#coin-count').textContent = Save.data.coins;
     renderLives(false);
     document.querySelectorAll('.booster').forEach((btn) => {
       const b = btn.dataset.booster;
       const locked = !C.boosterUnlocked(b, n) && !G.customLevel;
       btn.classList.toggle('locked', locked);
       btn.querySelector('.lock-tag').textContent = `🔒 Lv ${C.BOOSTERS[b].unlock}`;
-      const count = Save.data.boosters[b] || 0;
+      const count = INV.boosterCount(b);
       const badge = btn.querySelector('.badge');
       badge.textContent = count > 0 ? count : '+';
       badge.classList.toggle('plus', count <= 0);
     });
+  }
+
+  // meta hearts + regen timer (separate from the in-level leak drops)
+  function updateHearts() {
+    const el = $('#hearts'); if (!el) return;
+    const inf = INV.hasLimitless('life');
+    const lives = INV.lives();
+    $('#heart-count').textContent = inf ? '∞' : lives;
+    const t = $('#heart-timer');
+    t.textContent = (!inf && lives < INV.maxLives()) ? fmtClock(INV.secondsToNextLife()) : '';
+    el.classList.toggle('infinite', inf);
+    el.classList.toggle('full', !inf && lives >= INV.maxLives());
   }
 
   let shownLives = -1;
@@ -1089,8 +1149,10 @@
     app.dataset.state = G.state;
   }
   function bind(sel, fn) { const el = overlay.querySelector(sel); if (el) el.addEventListener('click', () => { A.click(); fn(el); }); }
+  // Dual-context close: resume the board when a level is in progress, else return to the home hub.
+  function metaBack() { if (G.session && G.session.status === 'playing') hideOverlay(); else showHome(); }
 
-  function showWin(reward) {
+  function showWin(reward, chestAwarded) {
     A.win();
     launchConfetti();
     const n = G.session.levelNumber;
@@ -1099,6 +1161,7 @@
     if (reward.flawless) rows.push(['Kusursuz bonus', reward.flawless]);
     if (reward.breather) rows.push(['Mola seviyesi bonusu', reward.breather]);
     const nextRank = C.rankFor(n + 1) !== C.rankFor(n) ? `<p>Yeni rütbe: <span class="rank-badge">${C.rankFor(n + 1)}</span></p>` : '';
+    const chestNote = chestAwarded ? '<p class="chest-note">🎁 Bir sandık kazandın! Ana menüden aç.</p>' : '';
     const last = G.index >= G.order.length - 1 && !G.customLevel;
     showOverlay(`
       <img class="buddy happy" src="${UI_ART.buddyHappy}" alt="">
@@ -1109,35 +1172,38 @@
         ${rows.map(([k, v], i) => `<div class="reward-row" style="animation-delay:${0.15 + i * 0.15}s"><span>${k}</span><b><span class="coin-icon"></span>+${v}</b></div>`).join('')}
         <div class="reward-row total" style="animation-delay:${0.15 + rows.length * 0.15}s"><span>Toplam</span><b><span class="coin-icon"></span>+${reward.total}</b></div>
       </div>
+      ${chestNote}
       ${nextRank}
       <div class="btns">
         <button class="btn green" id="w-next">${last ? 'Bölüm Seç' : 'Devam Et ▶'}</button>
-        <button class="btn secondary" id="w-menu">Bölümler</button>
+        <button class="btn secondary" id="w-menu">Ana Menü</button>
       </div>`, () => {
-      later(() => { A.coin(); const el = $('#coins'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); updateHud(); }, 500);
-      bind('#w-next', () => (last ? showLevelSelect() : nextLevel()));
-      bind('#w-menu', showLevelSelect);
+      // pending-buffer: the win reward lands when the coin animation plays (UI double-spend guard)
+      later(() => { INV.applyAllPending(); A.coin(); const el = $('#coins'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); updateHud(); }, 500);
+      bind('#w-next', () => (last ? showHome() : nextLevel()));
+      bind('#w-menu', showHome);
     });
   }
 
   function showLose() {
     const canAd = !G.revived;
-    const patches = Save.data.boosters.patch || 0;
-    const patchOk = patches > 0 && (C.boosterUnlocked('patch', G.session.levelNumber) || G.customLevel);
+    const cost = Meta.boosters.resolveCost('patch');
+    const patchOk = cost.affordable && (C.boosterUnlocked('patch', G.session.levelNumber) || G.customLevel) && G.session.leaks < G.session.maxLeaks;
+    const patchLabel = cost.how === 'coins' ? `${cost.price} jeton` : `${INV.boosterCount('patch')} adet Yama`;
     showOverlay(`
       <img class="buddy sad" src="${UI_ART.buddySad}" alt="">
       <img class="mascot worried" src="assets/sprites/mascot_worried.png" alt="Usta endişeli">
       <h2>Eyvah, Su Kaçtı!</h2>
       <p>Damlalar bitti. Depoda hâlâ %${Math.round(G.session.waterRatio * 100)} su var.</p>
       <div class="btns">
-        ${patchOk ? `<button class="btn blue" id="l-patch">Yama ile Devam<small>1 Yama kullan (${patches} adet)</small></button>` : ''}
+        ${patchOk ? `<button class="btn blue" id="l-patch">Yama ile Devam<small>${patchLabel}</small></button>` : ''}
         ${canAd ? '<button class="btn yellow" id="l-ad">+1 Damla ile Devam<small>Ödüllü reklam izle</small></button>' : ''}
         <button class="btn green" id="l-retry">Tekrar Dene ↻</button>
-        <button class="btn secondary" id="l-menu">Bölümler</button>
+        <button class="btn secondary" id="l-menu">Ana Menü</button>
       </div>`, () => {
-      bind('#l-retry', () => startLevel(G.index, G.customLevel ? G.raw : null));
-      bind('#l-menu', showLevelSelect);
-      bind('#l-patch', () => { Save.data.boosters.patch--; Save.save(); trackBooster('patch'); revive(); });
+      bind('#l-retry', () => playLevel(G.index, G.customLevel ? G.raw : null));
+      bind('#l-menu', showHome);
+      bind('#l-patch', () => { Meta.boosters.spend('patch', cost.how); trackBooster('patch', cost.how); revive(); });
       bind('#l-ad', () => showRewarded('revive', () => { G.revived = true; revive(); }));
     });
   }
@@ -1181,37 +1247,48 @@
     showOverlay(`
       <img class="sprite" src="${UI_DIR}booster_${b}.png" alt="">
       <h2>${info.name}</h2><p>${info.desc}</p>
+      <p class="muted">Jetonun: <b>${INV.coins}</b></p>
       <div class="btns">
-        <button class="btn" id="bs-buy" ${Save.data.coins < price ? 'disabled' : ''}>Satın Al<small>${price} jeton (sende ${Save.data.coins})</small></button>
+        <button class="btn" id="bs-buy" ${INV.coins < price ? 'disabled' : ''}>Jetonla Al<small>${price} jeton</small></button>
         <button class="btn blue" id="bs-ad">Reklam İzle<small>+1 ${info.name}</small></button>
+        <button class="btn yellow" id="bs-store">Güçlendirici Paketi<small>Mağaza</small></button>
         <button class="btn secondary" id="bs-close">Vazgeç</button>
       </div>`, () => {
-      bind('#bs-buy', (el) => { if (el.disabled) return; Save.data.coins -= price; Save.data.boosters[b] = (Save.data.boosters[b] || 0) + 1; Save.save(); A.coin(); hideOverlay(); updateHud(); });
-      bind('#bs-ad', () => showRewarded('booster_' + b, () => { Save.data.boosters[b] = (Save.data.boosters[b] || 0) + 1; Save.save(); updateHud(); }));
-      bind('#bs-close', hideOverlay);
+      bind('#bs-buy', (el) => { if (el.disabled) return; if (INV.spend('shop:booster', 'coin', price)) { INV.earn('shop:booster', { [b]: 1 }); A.coin(); } hideOverlay(); updateHud(); });
+      bind('#bs-ad', () => showRewarded('booster_' + b, () => { INV.earn('ad:booster', { [b]: 1 }); updateHud(); }));
+      bind('#bs-store', () => showShop());
+      bind('#bs-close', metaBack);
     });
   }
 
+  const SHOP_ICONS = { bundle: '🎁', coins: '🪙', boosters: '🧰', lives: '❤️', infinite: '♾️', subscription: '👑', noads: '🚫' };
   function showShop() {
+    const rows = Meta.shop.catalogue.map((p) => {
+      const owned = !Meta.shop.available(p);
+      const active = (p.id === 'magic_pass' && Meta.magicPass.active()) || (p.id === 'no_ads' && INV.hasLimitless('noAds'));
+      const tag = p.tag ? `<span class="shop-tag ${p.tag}">${p.tag === 'offer' ? 'FIRSAT' : p.tag === 'popular' ? 'POPÜLER' : p.tag === 'best' ? 'EN İYİ' : p.tag === 'sub' ? 'ABONELİK' : p.tag}</span>` : '';
+      const chan = `<span class="chan ${p.channel}">${p.channel === 'web' ? 'Web Mağaza' : 'Mağaza'}</span>`;
+      return `<div class="shop-item ${p.tag === 'offer' ? 'highlight' : ''}">
+        <span class="shop-ico">${SHOP_ICONS[p.kind] || '🛒'}</span>
+        <div class="grow">${tag}${p.title}<small>${p.desc || ''} ${chan}</small></div>
+        <button class="btn" data-buy="${p.id}" ${owned || active ? 'disabled' : ''}>${active ? 'Aktif' : owned ? 'Alındı' : fmtTRY(p.priceTRY)}</button>
+      </div>`;
+    }).join('');
     showOverlay(`
-      <h2>Mağaza</h2><p>Satın alımlar simülasyondur (mock IAP).</p>
-      <div class="settings-list">
-        ${IAP_PRODUCTS.map((p) => `<div class="shop-item"><span class="coin-icon" style="width:40px;height:40px"></span><div class="grow">${p.title}<small>${p.noAds ? 'Geçiş reklamlarını kaldırır' : 'Güçlendirici almak için'}</small></div>
-          <button class="btn" data-iap="${p.id}" ${p.noAds && Save.data.noAds ? 'disabled' : ''}>${p.noAds && Save.data.noAds ? 'Alındı' : p.price.toFixed(2).replace('.', ',') + ' ₺'}</button></div>`).join('')}
-      </div>
+      <h2>Mağaza</h2>
+      <p class="muted">Jetonun: <b>${INV.coins}</b> · satın alımlar simülasyondur (mock IAP). Her satın alma sunucuda doğrulanır.</p>
+      <div class="settings-list shop-list">${rows}</div>
       <div class="btns"><button class="btn secondary" id="shop-close">Kapat</button></div>`, (o) => {
-      o.querySelectorAll('[data-iap]').forEach((btn) => btn.addEventListener('click', () => {
+      o.querySelectorAll('[data-buy]').forEach((btn) => btn.addEventListener('click', () => {
         if (btn.disabled) return;
-        const prod = IAP_PRODUCTS.find((p) => p.id === btn.dataset.iap);
-        if (prod.coins) Save.data.coins += prod.coins;
-        if (prod.noAds) Save.data.noAds = true;
-        Save.save();
-        Analytics.track('iap_purchase', { productId: prod.id, price: prod.price, currency: 'TRY', mock: true });
-        A.coin();
+        const prod = Meta.shop.product(btn.dataset.buy);
+        const r = Meta.shop.buy(prod.id); // dual-channel, receipt-validated server-side
+        Analytics.track('iap_purchase', { productId: prod.id, price: prod.priceTRY, currency: 'TRY', channel: prod.channel, ok: r.ok, mock: true });
+        if (r.ok) { A.coin(); toast(`${prod.title} alındı ✓`); } else { toast('Satın alma başarısız: ' + (r.error || '')); }
         updateHud();
         showShop();
       }));
-      bind('#shop-close', hideOverlay);
+      bind('#shop-close', metaBack);
     });
   }
 
@@ -1220,19 +1297,19 @@
       <h2>Ayarlar</h2>
       <div class="btns">
         <button class="btn secondary" id="s-sound">Ses: ${Save.data.sound ? 'Açık 🔊' : 'Kapalı 🔇'}</button>
-        <button class="btn" id="s-restart">Seviyeyi Yeniden Başlat ↻</button>
-        <button class="btn green" id="s-levels">Bölüm Seç</button>
+        <button class="btn" id="s-restart" ${G.session ? '' : 'disabled'}>Seviyeyi Yeniden Başlat ↻</button>
+        <button class="btn green" id="s-home">Ana Menü</button>
         <button class="btn blue" id="s-shop">Mağaza</button>
         <button class="btn red" id="s-reset">İlerlemeyi Sıfırla</button>
         <button class="btn secondary" id="s-close">Kapat</button>
       </div>
-      <p style="font-size:12px;margin-top:12px">${G.pack.manifest.levels.length} seviye · kaynak: ${G.pack.source} · ?dev=1 geliştirici paneli</p>`, () => {
+      <p style="font-size:12px;margin-top:12px">${G.pack.manifest.levels.length} seviye · kaynak: ${G.pack.source} · ?dev=1 geliştirici paneli${INV.wasTampered() ? ' · ⚠ kayıt bütünlüğü: sunucudan düzeltildi' : ''}</p>`, () => {
       bind('#s-sound', () => { Save.data.sound = !Save.data.sound; Save.save(); A.setEnabled(Save.data.sound); showSettings(); });
-      bind('#s-restart', () => startLevel(G.index, G.customLevel ? G.raw : null));
-      bind('#s-levels', showLevelSelect);
+      bind('#s-restart', (el) => { if (!el.disabled && G.session) startLevel(G.index, G.customLevel ? G.raw : null); });
+      bind('#s-home', showHome);
       bind('#s-shop', showShop);
-      bind('#s-reset', () => { Save.reset(); A.setEnabled(true); startLevel(0); });
-      bind('#s-close', hideOverlay);
+      bind('#s-reset', () => { Save.reset(); try { localStorage.removeItem('suUstasi.meta.v1.cloud'); localStorage.removeItem('suUstasi.meta.v1.inv'); } catch (e) { /* ignore */ } A.setEnabled(true); location.reload(); });
+      bind('#s-close', metaBack);
     });
   }
 
@@ -1246,14 +1323,209 @@
       const cls = ['lvl', Save.data.completed[e.level] ? 'done' : '', i === G.index ? 'current' : '', e.breather ? 'breather' : '', locked ? 'locked' : ''].join(' ');
       return `${head}<button class="${cls}" data-i="${i}" ${locked ? 'disabled' : ''} title="Zorluk ${e.difficultyScore}">${locked ? '🔒' : e.level}</button>`;
     }).join('');
-    showOverlay(`<h2>Bölümler</h2><p>Jeton: ${Save.data.coins} · Rütbe: <span class="rank-badge">${C.rankFor(G.order[Save.data.maxIndex].level)}</span></p>
+    showOverlay(`<h2>Bölümler</h2><p>Jeton: ${INV.coins} · Rütbe: <span class="rank-badge">${C.rankFor(G.order[Save.data.maxIndex].level)}</span></p>
       <div class="level-grid">${cells}</div><div class="btns"><button class="btn secondary" id="ls-close">Kapat</button></div>`, (o) => {
-      o.querySelectorAll('.lvl[data-i]').forEach((btn) => btn.addEventListener('click', () => { if (btn.disabled) return; A.click(); startLevel(+btn.dataset.i); }));
+      o.querySelectorAll('.lvl[data-i]').forEach((btn) => btn.addEventListener('click', () => { if (btn.disabled) return; A.click(); playLevel(+btn.dataset.i); }));
       bind('#ls-close', () => {
-        if (G.session && G.session.status === 'won') startLevel(G.customLevel ? G.index : G.index + 1);
-        else if (G.session && G.session.status === 'lost') startLevel(G.index, G.customLevel ? G.raw : null);
+        if (G.session && G.session.status === 'won') playLevel(G.customLevel ? G.index : G.index + 1, G.customLevel ? G.raw : null);
+        else if (G.session && G.session.status === 'lost') playLevel(G.index, G.customLevel ? G.raw : null);
         else hideOverlay();
       });
+    });
+  }
+
+  // =================================================================== meta screens (home hub + systems)
+  const BAG_ICON = { coin: '<span class="coin-icon sm"></span>', xray: '🔎', hammer: '🔨', patch: '🩹', chest: '🎁', wheelToken: '🎡', trophy: '🏆', life: '❤️' };
+  const BAG_NAME = { coin: 'Jeton', xray: 'Röntgen', hammer: 'Çekiç', patch: 'Yama', chest: 'Sandık', wheelToken: 'Çark Bileti', trophy: 'Kupa', life: 'Can' };
+  function bagHtml(bag) {
+    return Object.keys(bag).map((k) => `<span class="bag-item">${BAG_ICON[k] || '•'} <b>+${bag[k]}</b> ${BAG_NAME[k] || k}</span>`).join('');
+  }
+
+  function showHome() {
+    clearTimers();
+    if (G.session && (G.session.status === 'won' || G.session.status === 'lost')) G.session = null;
+    const idx = Math.min(Save.data.maxIndex, G.order.length - 1);
+    const lvl = G.order[idx].level;
+    const inf = INV.hasLimitless('life');
+    const livesStr = inf ? '∞' : `${INV.lives()}/${INV.maxLives()}`;
+    const timerStr = (!inf && INV.lives() < INV.maxLives()) ? `· sonraki ${fmtClock(INV.secondsToNextLife())}` : '';
+    const passActive = Meta.magicPass.active();
+    const passBanner = passActive
+      ? `<div class="pass-banner active">👑 Usta Kartı aktif · bitişe ${fmtClock((Meta.magicPass.untilMs() - Meta.now()) / 1000)}</div>`
+      : `<button class="pass-banner" id="h-pass">👑 Usta Kartı — sınırsız can & reklamsız <span>İncele ▶</span></button>`;
+    const badge = (on, txt) => on ? `<span class="hb-badge">${txt}</span>` : '';
+    showOverlay(`
+      <div class="home">
+        <div class="home-top">
+          <div class="home-currency"><span class="heart-icon">❤</span> ${livesStr} <small>${timerStr}</small></div>
+          <div class="home-currency"><span class="coin-icon sm"></span> ${INV.coins}</div>
+          <div class="home-currency">🏆 ${INV.trophies}</div>
+        </div>
+        <img class="mascot happy" src="assets/sprites/mascot_happy.png" alt="Usta">
+        <h2>Su Ustası</h2>
+        ${passBanner}
+        <button class="btn green big" id="h-play">Oyna ▶<small>Seviye ${lvl}</small></button>
+        <div class="home-grid">
+          <button class="hb" id="h-levels">🗺️<span>Bölümler</span></button>
+          <button class="hb" id="h-daily">📅<span>Günlük</span>${badge(Meta.daily.canClaim(), '!')}</button>
+          <button class="hb" id="h-chests">🎁<span>Sandık</span>${badge(Meta.chests.count() > 0, Meta.chests.count())}</button>
+          <button class="hb" id="h-wheel">🎡<span>Çark</span>${badge(Meta.wheel.freeReady(), '!')}</button>
+          <button class="hb" id="h-arena">🏆<span>Arena</span></button>
+          <button class="hb" id="h-shop">🛒<span>Mağaza</span></button>
+        </div>
+      </div>`, () => {
+      app.dataset.state = 'home';
+      bind('#h-play', () => playLevel(idx));
+      bind('#h-levels', showLevelSelect);
+      bind('#h-daily', showDaily);
+      bind('#h-chests', showChests);
+      bind('#h-wheel', showWheel);
+      bind('#h-arena', showArena);
+      bind('#h-shop', showShop);
+      bind('#h-pass', showMagicPass);
+    });
+  }
+
+  function showOutOfLives(retry) {
+    const inf = Meta.shop.product('infinite_lives_1h'), refill = Meta.shop.product('lives_refill');
+    const resume = () => { updateHud(); if (retry) retry(); };
+    showOverlay(`
+      <img class="mascot worried" src="assets/sprites/mascot_worried.png" alt="">
+      <h2>Canların Bitti!</h2>
+      <p>Bir sonraki can: <b>${fmtClock(INV.secondsToNextLife())}</b></p>
+      <div class="btns">
+        <button class="btn green" id="ol-ad">Reklam İzle +1 ❤<small>Ödüllü reklam</small></button>
+        <button class="btn blue" id="ol-inf">1 Saat Sınırsız ❤<small>${fmtTRY(inf.priceTRY)}</small></button>
+        <button class="btn yellow" id="ol-refill">Canları Doldur<small>${fmtTRY(refill.priceTRY)}</small></button>
+        <button class="btn" id="ol-pass">👑 Usta Kartı<small>Sınırsız can</small></button>
+        <button class="btn secondary" id="ol-close">Bekle</button>
+      </div>`, () => {
+      bind('#ol-ad', () => showRewarded('life', () => { INV.addLives(1); hideOverlay(); resume(); }));
+      bind('#ol-inf', () => { if (Meta.shop.buy('infinite_lives_1h').ok) { hideOverlay(); resume(); } else toast('Satın alma başarısız'); });
+      bind('#ol-refill', () => { if (Meta.shop.buy('lives_refill').ok) { hideOverlay(); resume(); } else toast('Satın alma başarısız'); });
+      bind('#ol-pass', showMagicPass);
+      bind('#ol-close', showHome);
+    });
+  }
+
+  function showDaily() {
+    const today = Meta.daily.todayIndex();
+    const can = Meta.daily.canClaim();
+    const days = Meta.config.daily.map((bag, i) => {
+      const claimedPast = i < today || (!can && i === today);
+      const cls = ['daily-day', i === today && can ? 'today' : '', claimedPast ? 'claimed' : ''].join(' ');
+      return `<div class="${cls}"><small>${i + 1}. Gün</small><div class="dd-reward">${bagHtml(bag)}</div></div>`;
+    }).join('');
+    showOverlay(`
+      <h2>Günlük Ödül</h2>
+      <p class="muted">Seri: <b>${Meta.daily.streak()}</b> gün · her gün giriş yap, serini büyüt.</p>
+      <div class="daily-grid">${days}</div>
+      <div class="btns">
+        <button class="btn green" id="d-claim" ${can ? '' : 'disabled'}>${can ? 'Ödülü Al' : 'Bugün Alındı ✓'}</button>
+        <button class="btn secondary" id="d-close">Kapat</button>
+      </div>`, () => {
+      bind('#d-claim', (el) => { if (el.disabled) return; const r = Meta.daily.claim(); if (r) { A.coin(); toast('Günlük ödül alındı: ' + Object.keys(r.bag).map((k) => `+${r.bag[k]} ${BAG_NAME[k] || k}`).join(', '), 3200); } updateHud(); showDaily(); });
+      bind('#d-close', showHome);
+    });
+  }
+
+  function showChests() {
+    const count = Meta.chests.count();
+    showOverlay(`
+      <img class="sprite chest-art ${count > 0 ? 'ready' : ''}" src="${UI_DIR}pill.png" alt="" style="display:none">
+      <div class="chest-big ${count > 0 ? 'ready' : ''}">🎁</div>
+      <h2>Sandıklar</h2>
+      <p class="muted">${count > 0 ? `${count} sandığın var. Her ${Meta.config.chest.winEvery} galibiyette bir sandık kazanırsın.` : `Henüz sandığın yok. Her ${Meta.config.chest.winEvery} galibiyette bir kazanırsın.`}</p>
+      <div id="chest-reveal" class="reveal"></div>
+      <div class="btns">
+        <button class="btn green" id="c-open" ${count > 0 ? '' : 'disabled'}>Sandık Aç (${count})</button>
+        <button class="btn secondary" id="c-close">Kapat</button>
+      </div>`, () => {
+      bind('#c-open', (el) => {
+        if (el.disabled) return;
+        const bag = Meta.chests.open();
+        if (!bag) return;
+        INV.earn('chest:reward', bag); A.win();
+        overlay.querySelector('#chest-reveal').innerHTML = `<div class="reveal-in">${bagHtml(bag)}</div>`;
+        updateHud();
+        later(() => showChests(), 1400);
+      });
+      bind('#c-close', showHome);
+    });
+  }
+
+  function showWheel() {
+    const segs = Meta.wheel.segments;
+    const free = Meta.wheel.freeReady();
+    const slice = 360 / segs.length;
+    const grad = segs.map((s, i) => `${i % 2 ? '#BDE9FF' : '#FFF4E0'} ${i * slice}deg ${(i + 1) * slice}deg`).join(', ');
+    const labels = segs.map((s, i) => `<div class="wheel-label" style="transform:rotate(${i * slice + slice / 2}deg)"><span>${s.label}</span></div>`).join('');
+    showOverlay(`
+      <h2>Şans Çarkı</h2>
+      <p class="muted">${free ? 'Ücretsiz çevirme hazır!' : `Ücretsiz çevirmeye ${fmtClock(Meta.wheel.secondsToFree())} · ya da 1 çark bileti (${INV.wheelTokens})`}</p>
+      <div class="wheel-wrap"><div class="wheel-pointer">▼</div><div class="wheel" id="wheel" style="background:conic-gradient(${grad})">${labels}</div></div>
+      <div id="wheel-reveal" class="reveal"></div>
+      <div class="btns">
+        <button class="btn green" id="w-spin" ${free || INV.wheelTokens > 0 ? '' : 'disabled'}>${free ? 'Ücretsiz Çevir' : 'Çevir (1 bilet)'}</button>
+        <button class="btn secondary" id="w-close">Kapat</button>
+      </div>`, () => {
+      let spinning = false;
+      bind('#w-spin', (el) => {
+        if (el.disabled || spinning) return;
+        const res = Meta.wheel.spin();
+        if (!res) { toast('Çevirme hakkın yok'); return; }
+        spinning = true; el.disabled = true;
+        const wheel = overlay.querySelector('#wheel');
+        const target = 360 * 5 + (360 - (res.index * slice + slice / 2)); // land pointer (top) on the slice
+        wheel.style.transition = 'transform 3s cubic-bezier(.17,.67,.21,1)';
+        void wheel.offsetWidth; wheel.style.transform = `rotate(${target}deg)`;
+        A.xray();
+        later(() => {
+          INV.earn('wheel:reward', res.bag); A.win();
+          overlay.querySelector('#wheel-reveal').innerHTML = `<div class="reveal-in">${bagHtml(res.bag)}</div>`;
+          updateHud();
+          later(() => showWheel(), 1500);
+        }, 3100);
+      });
+      bind('#w-close', showHome);
+    });
+  }
+
+  function showArena() {
+    const b = Meta.arena.board();
+    const rows = b.rows.map((r) => `<div class="arena-row ${r.me ? 'me' : ''}">
+      <span class="ar-rank ${r.rank <= 3 ? 'top' : ''}">${r.rank}</span>
+      <span class="ar-name">${r.name}</span>
+      <span class="ar-score">🏆 ${r.score}</span></div>`).join('');
+    const tiers = Meta.config.arena.rewards.map((t) => `<span class="tier">#${t.rank}: ${bagHtml(t.bag)}</span>`).join('');
+    showOverlay(`
+      <h2>Haftalık Arena</h2>
+      <p class="muted">Bitişe <b>${fmtClock(b.endsInMs / 1000)}</b> · skorun = tamamlanan bölüm sayısı</p>
+      <div class="arena-list">${rows}</div>
+      <p class="muted" style="margin-top:8px">Ödüller: ${tiers}</p>
+      <div class="btns"><button class="btn secondary" id="a-close">Kapat</button></div>`, () => {
+      bind('#a-close', showHome);
+    });
+  }
+
+  function showMagicPass() {
+    const active = Meta.magicPass.active();
+    const p = Meta.shop.product('magic_pass');
+    showOverlay(`
+      <div class="pass-hero">👑</div>
+      <h2>Usta Kartı</h2>
+      ${active ? `<p>Aktif! Bitişe <b>${fmtClock((Meta.magicPass.untilMs() - Meta.now()) / 1000)}</b></p>` : '<p class="muted">30 gün boyunca:</p>'}
+      <div class="perks">
+        <div class="perk">♾️ Sınırsız can</div>
+        <div class="perk">🚫 Reklamsız oyun</div>
+        <div class="perk"><span class="coin-icon sm"></span> Her gün +${Meta.config.magicPass.dailyCoins} jeton</div>
+      </div>
+      <div class="btns">
+        <button class="btn green" id="mp-buy" ${active ? 'disabled' : ''}>${active ? 'Aktif ✓' : fmtTRY(p.priceTRY)}</button>
+        <button class="btn secondary" id="mp-close">Kapat</button>
+      </div>`, () => {
+      bind('#mp-buy', (el) => { if (el.disabled) return; const r = Meta.shop.buy('magic_pass'); if (r.ok) { A.win(); toast('Usta Kartı aktif! 👑'); updateHud(); showMagicPass(); } else toast('Satın alma başarısız'); });
+      bind('#mp-close', showHome);
     });
   }
 
@@ -1332,7 +1604,12 @@
   function hideTooltip() { $('#tooltip').classList.add('hidden'); }
 
   $('#btn-settings').addEventListener('click', () => { A.unlock(); A.click(); if (G.pack) showSettings(); });
+  $('#btn-home').addEventListener('click', () => { A.unlock(); A.click(); if (G.pack) showHome(); });
   $('#coins').addEventListener('click', () => { A.unlock(); A.click(); if (G.pack) showShop(); });
+  $('#hearts').addEventListener('click', () => { A.unlock(); A.click(); if (!G.pack) return; if (INV.lives() <= 0 && !INV.hasLimitless('life')) showOutOfLives(null); else showHome(); });
+  // meta hearts regenerate in real time → refresh the HUD timer each second
+  setInterval(updateHearts, 1000);
+  INV.onChange(() => { const c = $('#coin-count'); if (c) c.textContent = INV.coins; updateHearts(); });
 
   // =================================================================== dev panel (?dev=1): metrics, auto-solve, custom JSON
   function renderDev() {
@@ -1413,9 +1690,13 @@
     G.order = G.pack.manifest.levels.slice().sort((a, b) => a.level - b.level);
     const want = parseInt(params.get('level'), 10);
     let start = Math.min(Save.data.maxIndex, G.order.length - 1);
-    if (want) { const i = G.order.findIndex((e) => e.level === want); if (i >= 0) start = i; }
+    let jump = false;
+    if (want) { const i = G.order.findIndex((e) => e.level === want); if (i >= 0) { start = i; jump = true; } }
     requestAnimationFrame(frame);
-    startLevel(start);
+    updateHearts();
+    // ?level=N (or dev) jumps straight in; otherwise open the home hub
+    if (jump || DEV) playLevel(start);
+    else showHome();
   }
   boot();
 })();

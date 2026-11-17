@@ -20,8 +20,15 @@ The repo contains two deliverables that share one rule set:
 | [`unity-project/Assets/_Game/`](unity-project/Assets/_Game) | Unity 2D (URP) C# codebase: rules core, reverse-build generator + solver, services, runtime views/HUD, Editor + batch-mode tools, NUnit EditMode tests, JSON level pack |
 | [`web-playable/`](web-playable) | Zero-dependency HTML5 Canvas/JS playable using the same rules, palette, Web Audio SFX and JSON levels |
 
-The C# and JavaScript implementations are kept in lockstep. For the same seed the C# generator writes **byte-identical**
-level files, and the C# solver reproduces every metric and solution of the JS solver (`npm run test:cs` checks both).
+The **rules core, generator, solver and level pack** are kept in lockstep across C# and JavaScript. For the same seed the
+C# generator writes **byte-identical** level files, and the C# solver reproduces every metric and solution of the JS
+solver (`npm run test:cs` checks both).
+
+> **Meta-economy (web-first).** The full live-ops meta layer — regenerating lives, multi-currency inventory, the
+> Try/Spend booster economy, shop/IAP, daily reward, chests, wheel and weekly arena — currently ships in the
+> **web playable only** ([`web-playable/js/economy.js`](web-playable/js/economy.js)). It is built on a
+> **server-authoritative mock backend** so the same contract can be re-pointed at a real backend, and is mirrored into
+> the Unity C# project in a later pass. See [Meta-economy](#meta-economy-live-ops) below.
 
 ---
 
@@ -71,10 +78,12 @@ tools/
 web-playable/
   index.html, css/style.css
   js/core.js                 rules core (UMD — browser global + Node require)
+  js/economy.js              meta-economy engine: inventory, lives, Try/Spend boosters, shop/IAP,
+                             daily/chests/wheel/arena + server-authoritative mock backend & integrity (UMD)
   js/solver.js               deterministic solver + difficulty metrics
   js/generator.js            reverse-build generator
   js/audio.js                Web Audio synthesized SFX
-  js/game.js                 renderer, input, flow, boosters, FTUE, meta, mock services
+  js/game.js                 renderer, input, flow, home hub, boosters, FTUE, meta screens, mock services
   levels/                    level_XXX.json + manifest.json + levels.bundle.js
   assets/                    reference JPGs + sprites/ (sliced PNGs + sprites.json)
 unity-project/
@@ -127,7 +136,9 @@ though mistakes still count against the flawless bonus.
 
 **Boosters.** X-Ray (unlocks at L5) highlights the pipes a tap would remove for 3 s. Hammer (L10) removes any pipe
 regardless of blockers; this counts as an exit for ice and keys, not as a tap. Patch (L15) gives +1 leak life, capped at 4.
-Each booster is gifted once at its unlock level and can be bought with coins or a rewarded ad.
+Each booster is gifted once at its unlock level. In the web playable, tapping a booster you're out of **spends coins at
+the shelf price at the point of use** (X-Ray 60 / Hammer 120 / Patch 90) instead of just opening the shop — see
+[Meta-economy](#meta-economy-live-ops).
 
 **Economy & meta.** A win pays 20 coins, +10 if flawless (0 mistakes), +20 on breather levels (every 5th). Ranks:
 Çırak 1–19, Kalfa 20–49, Usta 50–99, Başusta 100+. Themes cycle every 20 levels: Banyo → Mutfak → Apartman Bodrumu →
@@ -143,6 +154,48 @@ them.
 **Visual & audio.** GDD palette: water #36A2FF, pipes #F2B632 / #E8743B / #5BBE7A, error #E5484D, background #FFF4E0.
 Water SFX rise 2 semitones per consecutive success, a blocked tap gives a metallic bonk, and a win plays a drain gurgle.
 All sounds are synthesized; there are no audio files (`audio.js` / `SfxRecipes.cs`).
+
+---
+
+## Meta-economy (live-ops)
+
+The web playable layers a full free-to-play meta on top of the puzzle, in [`web-playable/js/economy.js`](web-playable/js/economy.js)
+(a zero-dependency UMD module, unit-tested in [`tools/tests/economy.test.mjs`](tools/tests/economy.test.mjs)). It is the
+same feature set a mature title ships, reconstructed from a reverse-engineering study of a comparable Grand Games puzzle
+(*Block Out! — Color Sort*) and implemented with the **correct** patterns that study recommends rather than its
+weaknesses. The whole game opens on a **home hub** (`?level=N` or `?dev` still jump straight into a level).
+
+**Server-authoritative by design.** The client model is a UI cache only. Every `Spend` / `Earn` / purchase / limitless
+grant is committed through a **mock backend** (`createBackend`) that holds the authoritative state in its own store and
+re-validates each mutation — so the same contract can be re-pointed at a real server. `doesEnoughVisible()` is only a
+hint; the backend owns the truth. The local save is **signed**; a broken signature is treated as tampering and
+reconciled from the backend instead of trusted. Cloud sync uses a **monotonic version + per-currency delta thresholds
+reconciled against a transaction log**, so a tampered "last-write-wins" overwrite is rejected. An integrity token gates
+every committed mutation (a stand-in for Play Integrity / App Check).
+
+**Lives (hearts).** A meta life, separate from the in-level leak drops, gates entering a level (FTUE levels 1–3 are
+free). Lives are **DateTime-derived** — stored as a refill anchor, not an int, so they can't be faked with a plain write
+— and regenerate one per 20 min up to 5. Out of lives → a gate offering a rewarded ad (+1), a timed *infinite lives*
+power, a refill, or the subscription. Magic Pass / infinite-lives make spending a life a no-op.
+
+**Boosters — Try/Spend with coin fallback.** `tryUse()` orchestrates: a game-state gate → use from stock → otherwise
+buy at the shelf price in coins → otherwise prompt the shop. `spend()` is a separate consumption entry point (Hammer
+defers its spend until a pipe is actually removed). Consumption is a server-authoritative commit logged for anti-cheat
+cross-check.
+
+**Rewards.** Win payouts land through a **pending buffer** (accrue → `applyAllPending()` when the win card animates, a
+UI double-spend guard). A chest is awarded every 3rd win.
+
+**Shop / IAP.** Dual-channel catalogue — Google/Apple store **and** an out-of-store **WebShop** — with server-side
+receipt validation and replay protection, no local reward. Products: coin packs, a booster bundle, a lives refill, a
+timed infinite-lives power, **Usta Kartı** (30-day subscription: unlimited lives, no ads, daily coins), permanent
+*remove ads*, and a one-time **starter offer**.
+
+**Daily / Chests / Wheel / Arena.** A 7-day login streak; chests that roll a weighted reward table on open; an 8-segment
+Wheel of Fortune (free every 6 h, else a token); and a **weekly arena** leaderboard (seeded bots + your cleared-level
+score, server keeps the best).
+
+Reset everything from **Ayarlar → İlerlemeyi Sıfırla** (clears the save + both meta stores).
 
 ---
 
